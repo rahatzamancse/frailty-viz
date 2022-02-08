@@ -1,0 +1,136 @@
+// Cluster bg colors
+$colorCategory1: #d282beff; // middle-purple
+$colorCategory2: #a6d9efff; // uranian-blue
+$colorCategory3: #ffa770ff; // atomic-tangerine
+$colorCategory4: #e5f684ff; // mindaro
+$colorCategory5: #fef1f3ff; // lavender-blush
+
+.maingraph {
+  background: white;
+}
+
+// Cluster background
+g.hullgroup {
+    path.hull_1 {
+        fill: $colorCategory1;
+    }
+    path.hull_2 {
+        fill: $colorCategory2;
+    }
+    path.hull_3 {
+        fill: $colorCategory3;
+    }
+    path.hull_4 {
+        fill: $colorCategory4;
+    }
+}
+
+g.node circle.hovered {
+  stroke: blue;
+  stroke-width: 14px;
+}
+
+g.linkgroup {
+    g line {
+        stroke-width: 1px;
+    }
+
+    g.hovered line {
+      stroke: blue !important;
+      stroke-width: 3px !important;
+      opacity: 0.2 !important;
+    }
+
+    g.betweencategory line {
+        stroke: rgb(0, 0, 0);
+        opacity: 0.02;
+    }
+
+    g.intracategory line {
+        stroke: lightblue;
+        opacity: 0.1;
+    }
+    g text{
+      opacity: 0;
+    }
+    g text.hovered {
+      opacity: 1;
+    }
+}
+
+g.node circle {
+  r: 2px;
+  stroke: black;
+  stroke-width: 8px;
+  cursor: pointer;
+}
+
+g.node text {
+  cursor: pointer;
+}
+
+g.pinned circle {
+  stroke: red !important;
+  stroke-width: 12px !important;
+}
+
+// Sidebar
+main.main-ui {
+    display: flex;
+    flex-wrap: nowrap;
+    height: 100vh;
+    height: -webkit-fill-available;
+    max-height: 100vh;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+div.sidebar {
+    width: 360px;
+}
+
+.btn-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: .25rem .5rem;
+  font-weight: 600;
+  color: rgba(0, 0, 0, .65);
+  background-color: transparent;
+  border: 0;
+}
+.btn-toggle:hover,
+.btn-toggle:focus {
+  color: rgba(0, 0, 0, .85);
+  background-color: #d2f4ea;
+}
+
+.btn-toggle::before {
+  width: 1.25em;
+  line-height: 0;
+  content: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='rgba%280,0,0,.5%29' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5 14l6-6-6-6'/%3e%3c/svg%3e");
+  transition: transform .35s ease;
+  transform-origin: .5em 50%;
+}
+
+.btn-toggle[aria-expanded="true"] {
+  color: rgba(0, 0, 0, .85);
+}
+.btn-toggle[aria-expanded="true"]::before {
+  transform: rotate(90deg);
+}
+
+.btn-toggle-nav a {
+  display: inline-flex;
+  padding: .1875rem .5rem;
+  margin-top: .125rem;
+  margin-left: 1.25rem;
+  text-decoration: none;
+}
+.btn-toggle-nav a:hover,
+.btn-toggle-nav a:focus {
+  background-color: #d2f4ea;
+}
+
+.fw-semibold { font-weight: 600; }
+
+
+// Sidebar items

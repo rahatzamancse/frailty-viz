@@ -1,0 +1,12 @@
+/* Generic style */
+html {
+    height: -webkit-fill-available;
+}
+
+body {
+    padding: 0;
+    margin: 0;
+    background: #EEE;
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+}

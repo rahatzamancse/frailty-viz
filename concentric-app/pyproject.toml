@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "concentric-app"
+version = "0.1.0"
+description = "A flask app for the backend of concentric-webapp"
+authors = ["Rahat Zaman <rahatzamancse@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+networkx = "^2.6.3"
+fastapi = "^0.73.0"
+uvicorn = "^0.17.1"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
