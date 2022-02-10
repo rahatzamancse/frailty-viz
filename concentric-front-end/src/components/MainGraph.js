@@ -42,12 +42,13 @@ const forceProperties = {
     separation: {
         enabled: true,
         strength: 0.1,
-        radius: width*0.3
+        radius: width*0.5
     },
     link: {
         enabled: true,
         strength: 0.9,
-        iterations: 1
+        iterations: 1,
+        distanceFactor: 5
     },
     radial: {
         enabled: false,
@@ -70,6 +71,7 @@ const MainGraph = () => {
     // let selectedNode = dummyData;
     // const setSelectedNode = (d) => {
     //     selectedNode = d;
+    //     d3UpdateFunc();
     // };
     let maxDist = 100;
 
@@ -131,7 +133,7 @@ const MainGraph = () => {
 
         simulation.force("link")
             // @ts-ignore
-            .distance(d => normalizeDistance(d.freq, 1, maxDist, 1, 50))
+            .distance(d => normalizeDistance(d.freq, 1, maxDist, 1, 50)*forceProperties.link.distanceFactor)
             .iterations(forceProperties.link.iterations)
             // @ts-ignore
             .strength(forceProperties.link.enabled ? simulation.force("link").strength() : 0)
@@ -141,13 +143,13 @@ const MainGraph = () => {
         simulation.alpha(1).alphaMin(-1).restart();
     }
 
-
     const svgRef = React.useRef();
-    React.useEffect(() => {
+    const d3UpdateFunc = () => {
         console.log("effect called");
         if (selectedNode.nodes.nodes.length === 0) setSelectedNode(dummyData);
 
-        const svg = d3.select(svgRef.current);
+        const svgRoot = d3.select(svgRef.current);
+        const svg = d3.select(svgRef.current).select("g.everything");
         const svgHullGroup = svg.select('g.hullgroup');
         const svgLinkGroup = svg.select('g.linkgroup');
         const svgNodeGroup = svg.select('g.nodegroup');
@@ -167,7 +169,6 @@ const MainGraph = () => {
             body: JSON.stringify(selectedNode)
         }).then(response => response.json())
         .then(subgraph => {
-
             maxDist = Math.max(...subgraph.links.map(link => link.freq));
 
             const link = svgLinkGroup
@@ -182,7 +183,25 @@ const MainGraph = () => {
                             .classed('intracategory', d => !d['samecategory']);
                         lineGroup.append("text")
                             .text(d => d.freq);
-                        lineGroup.append("line");
+                        const lineItem = lineGroup.append("line");
+                        lineItem
+                            .on('mouseover', (e) => {
+                                const line = d3.select(e.target.parentNode).classed('hovered', true);
+                                const lineData = line.data();
+                                d3.selectAll(`g#${lineData[0].source.id} circle`).classed('hovered', true);
+                                d3.selectAll(`g#${lineData[0].target.id} circle`).classed('hovered', true);
+                            })
+                            .on('mouseout', (e) => {
+                                const line = d3.select(e.target.parentNode).classed('hovered', false);
+                                const lineData = line.data();
+                                d3.selectAll(`g#${lineData[0].source.id} circle`).classed('hovered', false);
+                                d3.selectAll(`g#${lineData[0].target.id} circle`).classed('hovered', false);
+                            })
+                            .on('click', (e) => {
+                                const line = d3.select(e.target.parentNode).classed('hovered', true);
+                                const lineData = line.data();
+                                window.open(`http://river.cs.arizona.edu:1600/viz?src=${lineData[0].source.id.replace('_', ':')}&dst=${lineData[0].target.id.replace('_', ':')}&bidirect`, "_self")
+                            });
 
                         // Reinitialize force
                         const forces = ["link", 'charge', 'collide', 'center', 'forceX', 'forceY'];
@@ -198,6 +217,17 @@ const MainGraph = () => {
                     exit => exit.remove()
                 );
 
+            const nodeRadiusRange = [Math.min(...subgraph.nodes.map(node => node.degree)), Math.max(...subgraph.nodes.map(node => node.degree))]
+            const circleScale = d3.scaleLinear().domain(nodeRadiusRange).range([1, 10]);
+            console.log(nodeRadiusRange);
+
+            const categoryNodeColors = {
+                3: "#8a2a44",
+                4: "#10712b",
+                1: "#411c58",
+                2: "#00308e",
+            }
+
             const node = svgNodeGroup
                 .selectAll("g.node")
                 .data(subgraph.nodes, d => d.id)
@@ -211,14 +241,16 @@ const MainGraph = () => {
 
                         nodeGroup.append("text")
                             .text(d => d["label"])
-                            .attr('x', 6)
-                            .attr('y', 3);
+                            .attr('x', 10)
+                            .attr('y', 5);
                         // node tooltip
                         nodeGroup.append("title")
                             .text(d => d.id);
                         
 
                         nodeGroup.append("circle")
+                            .attr('r', d => circleScale(d.degree))
+                            .attr('stroke', d => categoryNodeColors[d.category])
                             .on('mouseover', (e) => {
                                 const circle = d3.select(e.target).classed('hovered', true);
                                 const nodeId = circle.data()[0].id;
@@ -232,7 +264,11 @@ const MainGraph = () => {
                                 d3.selectAll('g.linkgroup g.' + nodeId + '.hovered text').classed('hovered', false);
                                 d3.selectAll('g.linkgroup g.' + nodeId).classed('hovered', false);
 
-                            });
+                            })
+                            .on("click", (e) => {
+                                window.open(`http://river.cs.arizona.edu:1600/viz?src=uniprot:P05231&dst=go:GO:0006954&bidirect`, '_self');
+
+                            })
                         nodeGroup
                             // @ts-ignore
                             .call(d3.drag()
@@ -298,7 +334,7 @@ const MainGraph = () => {
             simulation.force("link")
                 // @ts-ignore
                 .id(d => d.id)
-                .distance(d => normalizeDistance(d.freq, 1, maxDist, 1, 50))
+                .distance(d => normalizeDistance(d.freq, 1, maxDist, 1, 50)*forceProperties.link.distanceFactor)
                 .iterations(forceProperties.link.iterations)
                 .links(subgraph.links)
                 // @ts-ignore
@@ -374,7 +410,87 @@ const MainGraph = () => {
                     }
                 });
             });
+        
+            // Legends
+            const colors = [
+                { id: "Protein", color: "#d282beff" },
+                { id: "Chemical", color: "#a6d9efff" },
+                { id: "Biological Process", color: "#ffa770ff" },
+                { id: "Diseases", color: "#e5f684ff" },
+            ];
+
+            // const svgLegends = d3.select(svgLegendRef.current).append('g').attr('class', 'categorylegends');
+            const svgColorLegends = svg.append('g')
+                .attr('class', 'categorylegends')
+                .attr('transform', `translate(${width - 200},25)`);
+            const legendSquareSize = 20;
+            svgColorLegends.selectAll('mydots')
+                .data(colors)
+                .enter()
+                .append('rect')
+                .attr('x', 0)
+                .attr('y', (d, i) => i * (legendSquareSize + 5))
+                .attr('width', legendSquareSize)
+                .attr('height', legendSquareSize)
+                .style('fill', d => d.color);
+
+            svgColorLegends.selectAll('mylabels')
+                .data(colors)
+                .enter()
+                .append("text")
+                .attr("x", legendSquareSize * 1.2)
+                .attr("y", (d, i) => i * (legendSquareSize + 5) + (legendSquareSize / 2)) // 100 is where the first dot appears. 25 is the distance between dots
+                .style("fill", d => d.color)
+                .text(d => d.id)
+                .attr("text-anchor", "left")
+                .style("alignment-baseline", "middle");
+
+            const svgSizeLegends = svg.append('g')
+                .attr('class', 'sizelegends')
+                .attr('transform', `translate(${width - 200},160)`);
+            const sizeLegendItemsCount = 3;
+
+            const linspace = (start, stop, num, endpoint = true) => {
+                const div = endpoint ? (num - 1) : num;
+                const step = (stop - start) / div;
+                return Array.from({ length: num }, (_, i) => start + step * i);
+            }
+
+            const legendSizeData = linspace(nodeRadiusRange[0], nodeRadiusRange[1], sizeLegendItemsCount)
+            const legendMaxCircleSize = circleScale(nodeRadiusRange[1]);
+
+            svgSizeLegends.selectAll('mydots')
+                .data(legendSizeData)
+                .enter()
+                .append('circle')
+                .attr('cx', 0)
+                .attr('cy', (d, i) => i * (legendMaxCircleSize*2))
+                .attr('r', d => circleScale(d))
+                .attr('width', legendMaxCircleSize)
+                .attr('height', legendMaxCircleSize)
+                .style('fill', d => "lightblue");
+
+            svgSizeLegends.selectAll('mylabels')
+                .data(legendSizeData)
+                .enter()
+                .append("text")
+                .attr("x", legendMaxCircleSize * 2)
+                .attr("y", (d, i) => i * (legendMaxCircleSize*2))
+                .style("fill", d => d.color)
+                .text(d => Math.round(d) + " degree")
+                .attr("text-anchor", "left")
+                .style("alignment-baseline", "middle");
+
         });
+
+
+
+        const zoomHandler = d3.zoom()
+            .on("zoom", (e) => {
+                svg.attr('transform', e.transform)
+            // @ts-ignore
+            })(svgRoot);
+
 
         return () => {
             console.log('Clean up');
@@ -386,112 +502,114 @@ const MainGraph = () => {
             svg.append('g').attr('class', 'linkgroup');
             svg.append('g').attr('class', 'nodegroup');
         }
-    });
+    }
+    
+    React.useEffect(d3UpdateFunc);
 
     return <main className="main-ui">
-    <div className="sidebar flex-shrink-0 p-3 bg-white">
-    <h4>Entropy</h4>
-    <div className="progress mb-5">
-        <div id="alpha_value" className="progress-bar" role="progressbar" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div>
-    </div>
-    <a href="/" className="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
-      <span className="fs-5 fw-semibold">Controls</span>
-    </a>
-    <ul className="list-unstyled ps-0">
-      <li className="mb-1">
-        <button className="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#entity-collapse" aria-expanded="false">
-            Entity
-        </button>
-        <div className="collapse" id="entity-collapse">
-          <ul className="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li>
-                <EntityAutoComplete fromEntityAutoComplete={updateNodeSuggestions} />
-            </li>
-            <li>
-                <label htmlFor="cluster1count" className="form-label">Protein Entity Count</label>
-                <input type="number" className="form-control clusternodecount" min="3" max="50" step="1" id="cluster1count" defaultValue="5" />
-            </li>
-            <li>
-                <label htmlFor="cluster2count" className="form-label">Disease Entity Count</label>
-                <input type="number" className="form-control clusternodecount" min="3" max="50" step="1" id="cluster2count" defaultValue="5" />
-            </li>
-            <li>
-                <label htmlFor="cluster3count" className="form-label">Chemical Entity Count</label>
-                <input type="number" className="form-control clusternodecount" min="3" max="50" step="1" id="cluster3count" defaultValue="5" />
-            </li>
-            <li>
-                <label htmlFor="cluster4count" className="form-label">Disease Entity Count</label>
-                <input type="number" className="form-control clusternodecount" min="3" max="50" step="1" id="cluster4count" defaultValue="5" />
-            </li>
-          </ul>
+        <div className="sidebar flex-shrink-0 p-3 bg-white">
+            <h4>Entropy</h4>
+            <div className="progress mb-5">
+                <div id="alpha_value" className="progress-bar" role="progressbar" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <a href="/" className="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
+                <span className="fs-5 fw-semibold">Controls</span>
+            </a>
+            <ul className="list-unstyled ps-0">
+                <li className="mb-1">
+                    <button className="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#entity-collapse" aria-expanded="false">
+                        Entity
+                    </button>
+                    <div className="collapse" id="entity-collapse">
+                        <ul className="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                            <li>
+                                <EntityAutoComplete fromEntityAutoComplete={updateNodeSuggestions} />
+                            </li>
+                            <li>
+                                <label htmlFor="cluster1count" className="form-label">Protein Entity Count</label>
+                                <input type="number" className="form-control clusternodecount" min="3" max="50" step="1" id="cluster1count" defaultValue="5" />
+                            </li>
+                            <li>
+                                <label htmlFor="cluster2count" className="form-label">Disease Entity Count</label>
+                                <input type="number" className="form-control clusternodecount" min="3" max="50" step="1" id="cluster2count" defaultValue="5" />
+                            </li>
+                            <li>
+                                <label htmlFor="cluster3count" className="form-label">Chemical Entity Count</label>
+                                <input type="number" className="form-control clusternodecount" min="3" max="50" step="1" id="cluster3count" defaultValue="5" />
+                            </li>
+                            <li>
+                                <label htmlFor="cluster4count" className="form-label">Disease Entity Count</label>
+                                <input type="number" className="form-control clusternodecount" min="3" max="50" step="1" id="cluster4count" defaultValue="5" />
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+                <li className="mb-1">
+                    <button className="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#visual-collapse" aria-expanded="false">
+                        Visual
+                    </button>
+                    <div className="collapse" id="visual-collapse">
+                        <ul className="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                            <li>
+                                <label htmlFor="interclusterEdgeOpacity" className="form-label">Inter Category Link Opacity</label>
+                                <input type="range" className="form-range" min="0" max="1" step="0.01" id="interclusterEdgeOpacity" defaultValue="0.1" />
+                            </li>
+                            <li>
+                                <label htmlFor="intraclusterEdgeOpacity" className="form-label">Between Category Link Opacity</label>
+                                <input type="range" className="form-range" min="0" max="1" step="0.01" id="intraclusterEdgeOpacity" defaultValue="0.1" />
+                            </li>
+                            <li>
+                                <label htmlFor="nodeLabelOpacity" className="form-label">Entity Label Opacity</label>
+                                <input type="range" className="form-range" min="0" max="1" step="0.01" id="nodeLabelOpacity" defaultValue="0.1" />
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+                <li className="mb-1">
+                    <button className="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#dashboard-collapse" aria-expanded="false">
+                        Graph Parameters
+                    </button>
+                    <div className="collapse" id="dashboard-collapse">
+                        <ul className="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                            <li>
+                                <div className="form-check form-switch m-3">
+                                    <input type="checkbox" className="form-check-input" id="simulationenabled" defaultChecked={true} onChange={e => {
+                                        if (e.target.checked) simulation.alpha(1).restart();
+                                        else simulation.stop();
+                                    }} />
+                                    <label className="form-check-label" htmlFor="simulationenabled"><b>Simulation</b></label>
+                                </div>
+                            </li>
+                            <li>
+                                <label htmlFor="graphparamsepfactor" className="form-label">Separation Factor</label>
+                                <input type="range" className="form-range" min="0" max="1" step="0.01" id="graphparamsepfactor" defaultValue="0.1" onChange={e => {
+                                    forceProperties.separation.strength = parseFloat(e.target.value);
+                                    updateForces();
+                                }} />
+                            </li>
+                            <li>
+                                <label htmlFor="linkstrength" className="form-label">Link Strength</label>
+                                <input type="range" className="form-range" min="0" max="1" step="0.01" id="linkstrength" defaultValue="0.9" onChange={e => {
+                                    forceProperties.link.strength = parseFloat(e.target.value);
+                                    updateForces();
+                                }} />
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+                <li className="border-top my-3"></li>
+                <li className="mb-1">
+                    <button className="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#account-collapse" aria-expanded="false">
+                        Others
+                    </button>
+                    <div className="collapse" id="account-collapse">
+                        <ul className="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                            <li><a href="#" className="link-dark rounded">Others</a></li>
+                        </ul>
+                    </div>
+                </li>
+            </ul>
         </div>
-      </li>
-      <li className="mb-1">
-        <button className="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#visual-collapse" aria-expanded="false">
-            Visual
-        </button>
-        <div className="collapse" id="visual-collapse">
-          <ul className="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li>
-                <label htmlFor="interclusterEdgeOpacity" className="form-label">Inter Category Link Opacity</label>
-                <input type="range" className="form-range" min="0" max="1" step="0.01" id="interclusterEdgeOpacity" defaultValue="0.1" />
-            </li>
-            <li>
-                <label htmlFor="intraclusterEdgeOpacity" className="form-label">Between Category Link Opacity</label>
-                <input type="range" className="form-range" min="0" max="1" step="0.01" id="intraclusterEdgeOpacity" defaultValue="0.1" />
-            </li>
-            <li>
-                <label htmlFor="nodeLabelOpacity" className="form-label">Entity Label Opacity</label>
-                <input type="range" className="form-range" min="0" max="1" step="0.01" id="nodeLabelOpacity" defaultValue="0.1" />
-            </li>
-          </ul>
-        </div>
-      </li>
-      <li className="mb-1">
-        <button className="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#dashboard-collapse" aria-expanded="false">
-        Graph Parameters
-        </button>
-        <div className="collapse" id="dashboard-collapse">
-          <ul className="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li>
-                <div className="form-check form-switch m-3">
-                    <input type="checkbox" className="form-check-input" id="simulationenabled" defaultChecked={true} onChange={e => {
-                        if (e.target.checked) simulation.alpha(1).restart();
-                        else simulation.stop();
-                    }} />
-                    <label className="form-check-label" htmlFor="simulationenabled"><b>Simulation</b></label>
-                </div>
-            </li>
-            <li>
-                <label htmlFor="graphparamsepfactor" className="form-label">Separation Factor</label>
-                <input type="range" className="form-range" min="0" max="1" step="0.01" id="graphparamsepfactor" defaultValue="0.1" onChange={e => {
-                    forceProperties.separation.strength = parseFloat(e.target.value);
-                    updateForces();
-                }} />
-            </li>
-            <li>
-                <label htmlFor="linkstrength" className="form-label">Link Strength</label>
-                <input type="range" className="form-range" min="0" max="1" step="0.01" id="linkstrength" defaultValue="0.9" onChange={e => {
-                    forceProperties.link.strength = parseFloat(e.target.value);
-                    updateForces();
-                }} />
-            </li>
-          </ul>
-        </div>
-      </li>
-      <li className="border-top my-3"></li>
-      <li className="mb-1">
-        <button className="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#account-collapse" aria-expanded="false">
-          Others
-        </button>
-        <div className="collapse" id="account-collapse">
-          <ul className="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-            <li><a href="#" className="link-dark rounded">Others</a></li>
-          </ul>
-        </div>
-      </li>
-    </ul>
-  </div>
         <div className="mainview">
             <div>
                 <label className="selected-label" htmlFor="selected-point">Selected:</label>
@@ -499,9 +617,11 @@ const MainGraph = () => {
             </div>
             <div className="mainview-drawings">
                 <svg ref={svgRef} id="maingraph" className="maingraph" height={height} width={width} >
-                    <g className="hullgroup"></g>
-                    <g className="linkgroup"></g>
-                    <g className="nodegroup"></g>
+                    <g className="everything">
+                        <g className="hullgroup"></g>
+                        <g className="linkgroup"></g>
+                        <g className="nodegroup"></g>
+                    </g>
                 </svg>
             </div>
         </div>

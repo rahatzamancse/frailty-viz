@@ -264,7 +264,8 @@ async def getbestsubgraph(nodes: NodesList, category_count: CategoryCount):
             'id': x[0],
             'category': get_category_number_from_id(x[0]),
             'label': d['label'] if 'label' in (d := x[1]) else x[0],
-            'pinned': next(filter(lambda d: d['id']==x[0], catFinalList[get_category_number_from_id(x[0])]))['pinned']
+            'pinned': next(filter(lambda d: d['id']==x[0], catFinalList[get_category_number_from_id(x[0])]))['pinned'],
+            'degree': G_se.degree(x[0])
         }, subgraph.nodes.data())),
         'links': list(map(lambda x: {
             'source': x[0],

@@ -36,9 +36,9 @@ g.linkgroup {
     }
 
     g.hovered line {
-      stroke: blue !important;
+      // stroke: blue !important;
       stroke-width: 3px !important;
-      opacity: 0.2 !important;
+      opacity: 0.3 !important;
     }
 
     g.betweencategory line {
@@ -59,8 +59,6 @@ g.linkgroup {
 }
 
 g.node circle {
-  r: 2px;
-  stroke: black;
   stroke-width: 8px;
   cursor: pointer;
 }
@@ -72,6 +70,11 @@ g.node text {
 g.pinned circle {
   stroke: red !important;
   stroke-width: 12px !important;
+}
+
+// Legends
+.mainview-legends {
+  background-color: white;
 }
 
 // Sidebar
