@@ -15,7 +15,6 @@ const dummyData = {
     }}
 };
 
-
 const width = 900, height = 900;
 
 // values for all forces
@@ -42,7 +41,7 @@ const forceProperties = {
     separation: {
         enabled: true,
         strength: 0.1,
-        radius: width*0.5
+        radius: width*0.25
     },
     link: {
         enabled: true,
@@ -67,20 +66,6 @@ const calculateCategoryCenters = (cats, r) => [...Array(cats).keys()].map(i => [
 
 const MainGraph = () => {
     console.log("Module Loading");
-    const [selectedNode, setSelectedNode] = React.useState(dummyData);
-    // let selectedNode = dummyData;
-    // const setSelectedNode = (d) => {
-    //     selectedNode = d;
-    //     d3UpdateFunc();
-    // };
-    let maxDist = 100;
-
-    const updateNodeSuggestions = (d) => {
-        setSelectedNode({
-            ...selectedNode,
-            nodes: {nodes: d}
-        });
-    };
 
     const simulation = d3.forceSimulation();
 
@@ -98,6 +83,7 @@ const MainGraph = () => {
         ));
 
 
+    let maxDist = 100;
     const updateForces = () => {
         // get each force by name and update the properties
         simulation.force("center")
@@ -144,15 +130,47 @@ const MainGraph = () => {
     }
 
     const svgRef = React.useRef();
+    // const [selectedNode, setSelectedNode] = React.useState(dummyData);
+    let selectedNode = dummyData;
+    const cleanUp = () => {
+        // console.log('Clean up');
+        // d3.select('g.linkgroup').remove();
+        // d3.select('g.hullgroup').remove();
+        // d3.select('g.nodegroup').remove();
+
+        // d3.select(svgRef.current).select('g.everything').append('g').attr('class', 'hullgroup');
+        // d3.select(svgRef.current).select('g.everything').append('g').attr('class', 'linkgroup');
+        // d3.select(svgRef.current).select('g.everything').append('g').attr('class', 'nodegroup');
+    };
+    const setSelectedNode = (d) => {
+        selectedNode = d;
+        cleanUp();
+        d3UpdateFunc();
+    };
+    const updateNodeSuggestions = (d) => {
+        setSelectedNode({
+            ...selectedNode,
+            nodes: {nodes: d}
+        });
+    };
+
+    const subgraph = {
+        nodes: [], links: []
+    };
+
     const d3UpdateFunc = () => {
         console.log("effect called");
-        if (selectedNode.nodes.nodes.length === 0) setSelectedNode(dummyData);
+        if (selectedNode.nodes.nodes.length === 0) { 
+            setSelectedNode(dummyData);
+            return;
+        }
 
         const svgRoot = d3.select(svgRef.current);
         const svg = d3.select(svgRef.current).select("g.everything");
         const svgHullGroup = svg.select('g.hullgroup');
         const svgLinkGroup = svg.select('g.linkgroup');
         const svgNodeGroup = svg.select('g.nodegroup');
+        const legendGroup = svgRoot.select('g.legendgroup');
 
         svgHullGroup
             .selectAll('path')
@@ -168,8 +186,39 @@ const MainGraph = () => {
             },
             body: JSON.stringify(selectedNode)
         }).then(response => response.json())
-        .then(subgraph => {
-            maxDist = Math.max(...subgraph.links.map(link => link.freq));
+        .then(newSubgraph => {
+            const newNodes = [];
+            const newLinks = [];
+            for(let i in newSubgraph.nodes) {
+                const myNode = subgraph.nodes.findIndex(node => node.id === newSubgraph.nodes[i].id)
+                if (myNode !== -1) {
+                    newNodes.push({
+                        ...subgraph.nodes[myNode],
+                        ...newSubgraph.nodes[i]
+                    });
+                }
+                else {
+                    newNodes.push({
+                        ...newSubgraph.nodes[i],
+                        x: width/2,
+                        y: height/2,
+                    });
+                }
+            }
+            for(let i in newSubgraph.links) {
+                const myEdge = subgraph.links.findIndex(edge => edge.source.id === newSubgraph.links[i].source && edge.target.id === newSubgraph.links[i].target)
+                if (myEdge !== -1) {
+                    newLinks.push({
+                        ...subgraph.links[myEdge],
+                        ...newSubgraph.links[i]
+                    });
+                }
+                else {
+                    newLinks.push(newSubgraph.links[i]);
+                }
+            }
+            subgraph.nodes = newNodes;
+            subgraph.links = newLinks;
 
             const link = svgLinkGroup
                 .selectAll('g.line')
@@ -178,7 +227,7 @@ const MainGraph = () => {
                     enter => {
                         const lineGroup = enter
                             .append('g')
-                            .attr('class', d => d.source + " " + d.target)
+                            .attr('class', d => "line " + d.source + " " + d.target)
                             .classed('betweencategory', d => d['samecategory'])
                             .classed('intracategory', d => !d['samecategory']);
                         lineGroup.append("text")
@@ -204,12 +253,12 @@ const MainGraph = () => {
                             });
 
                         // Reinitialize force
-                        const forces = ["link", 'charge', 'collide', 'center', 'forceX', 'forceY'];
-                        for(let i in forces) {
-                            simulation.force(forces[i]).initialize(subgraph.nodes, () => 1);
-                        }
+                        // const forces = ["link", 'charge', 'collide', 'center', 'forceX', 'forceY'];
+                        // for(let i in forces) {
+                        //     simulation.force(forces[i]).initialize(subgraph.nodes, () => 1);
+                        // }
 
-                        simulation.alpha(0.5).alphaTarget(0.3).restart();
+                        // simulation.alpha(0.5).alphaTarget(0.3).restart();
 
                         return lineGroup;
                     },
@@ -217,9 +266,11 @@ const MainGraph = () => {
                     exit => exit.remove()
                 );
 
-            const nodeRadiusRange = [Math.min(...subgraph.nodes.map(node => node.degree)), Math.max(...subgraph.nodes.map(node => node.degree))]
+            const nodeRadiusRange = [
+                Math.min(...subgraph.nodes.map(node => node.degree)), 
+                Math.max(...subgraph.nodes.map(node => node.degree))
+            ]
             const circleScale = d3.scaleLinear().domain(nodeRadiusRange).range([1, 10]);
-            console.log(nodeRadiusRange);
 
             const categoryNodeColors = {
                 3: "#8a2a44",
@@ -289,12 +340,6 @@ const MainGraph = () => {
                                     d.fy = null;
                                 }));
 
-                        // Reinitialize force
-                        const forces = ["link", 'charge', 'collide', 'center', 'forceX', 'forceY'];
-                        for(let i in forces) {
-                            simulation.force(forces[i]).initialize(subgraph.nodes, () => 1);
-                        }
-
                         simulation.alpha(0.5).alphaTarget(0.3).restart();
 
                         return nodeGroup;
@@ -305,48 +350,14 @@ const MainGraph = () => {
 
 
             simulation.nodes(subgraph.nodes);
+            maxDist = Math.max(...subgraph.links.map(link => link.freq));
 
-            // get each force by name and update the properties
-            simulation.force("center")
-                // @ts-ignore
-                .x(width * forceProperties.center.x)
-                .y(height * forceProperties.center.y)
-                .strength(forceProperties.center.enabled ? forceProperties.center.strength : 0);
-            simulation.force("charge")
-                // @ts-ignore
-                .strength(forceProperties.charge.strength * forceProperties.charge.enabled)
-                .distanceMin(forceProperties.charge.distanceMin)
-                .distanceMax(forceProperties.charge.distanceMax);
-            simulation.force("collide")
-                // @ts-ignore
-                .strength(forceProperties.collide.strength * forceProperties.collide.enabled)
-                .radius(forceProperties.collide.radius)
-                .iterations(forceProperties.collide.iterations);
-            const cat_centers = calculateCategoryCenters(4, forceProperties.separation.radius)
-            simulation.force("forceX")
-                // @ts-ignore
-                .strength(forceProperties.separation.strength * forceProperties.separation.enabled)
-                .x(d => cat_centers[d['category'] - 1][0]);
-            simulation.force("forceY")
-                // @ts-ignore
-                .strength(forceProperties.separation.strength * forceProperties.separation.enabled)
-                .y(d => cat_centers[d['category'] - 1][1]);
             simulation.force("link")
-                // @ts-ignore
                 .id(d => d.id)
-                .distance(d => normalizeDistance(d.freq, 1, maxDist, 1, 50)*forceProperties.link.distanceFactor)
-                .iterations(forceProperties.link.iterations)
-                .links(subgraph.links)
-                // @ts-ignore
-                .strength(forceProperties.link.enabled ? simulation.force("link").strength() : 0)
-            simulation.force("r")
-                // @ts-ignore
-                .radius(d =>  forceProperties.radial.categoryRadius[d['category']-1])
-                .strength(forceProperties.radial.strength * (forceProperties.radial.enabled?1:0));
+                .links(subgraph.links);
 
-            // updates ignored until this is run
-            // restarts the simulation (important if simulation has already slowed down)
-            simulation.alpha(1).restart();
+            updateForces();
+
 
             simulation.on("tick", () => {
                 link.selectAll('line')
@@ -419,12 +430,9 @@ const MainGraph = () => {
                 { id: "Diseases", color: "#e5f684ff" },
             ];
 
-            // const svgLegends = d3.select(svgLegendRef.current).append('g').attr('class', 'categorylegends');
-            const svgColorLegends = svg.append('g')
-                .attr('class', 'categorylegends')
-                .attr('transform', `translate(${width - 200},25)`);
+            const svgColorLegends = d3.select('g.categorylegends');
             const legendSquareSize = 20;
-            svgColorLegends.selectAll('mydots')
+            svgColorLegends.selectAll('rect')
                 .data(colors)
                 .enter()
                 .append('rect')
@@ -434,20 +442,18 @@ const MainGraph = () => {
                 .attr('height', legendSquareSize)
                 .style('fill', d => d.color);
 
-            svgColorLegends.selectAll('mylabels')
+            svgColorLegends.selectAll('text')
                 .data(colors)
                 .enter()
                 .append("text")
                 .attr("x", legendSquareSize * 1.2)
-                .attr("y", (d, i) => i * (legendSquareSize + 5) + (legendSquareSize / 2)) // 100 is where the first dot appears. 25 is the distance between dots
+                .attr("y", (d, i) => i * (legendSquareSize + 5) + (legendSquareSize / 2))
                 .style("fill", d => d.color)
                 .text(d => d.id)
                 .attr("text-anchor", "left")
                 .style("alignment-baseline", "middle");
 
-            const svgSizeLegends = svg.append('g')
-                .attr('class', 'sizelegends')
-                .attr('transform', `translate(${width - 200},160)`);
+            const svgSizeLegends = d3.select('g.sizelegends');
             const sizeLegendItemsCount = 3;
 
             const linspace = (start, stop, num, endpoint = true) => {
@@ -456,34 +462,40 @@ const MainGraph = () => {
                 return Array.from({ length: num }, (_, i) => start + step * i);
             }
 
-            const legendSizeData = linspace(nodeRadiusRange[0], nodeRadiusRange[1], sizeLegendItemsCount)
+            const legendSizeData = Array.from(linspace(nodeRadiusRange[0], nodeRadiusRange[1], sizeLegendItemsCount), (d, i) => ({
+                id: i, value: d
+            }))
             const legendMaxCircleSize = circleScale(nodeRadiusRange[1]);
 
-            svgSizeLegends.selectAll('mydots')
-                .data(legendSizeData)
-                .enter()
-                .append('circle')
-                .attr('cx', 0)
-                .attr('cy', (d, i) => i * (legendMaxCircleSize*2))
-                .attr('r', d => circleScale(d))
-                .attr('width', legendMaxCircleSize)
-                .attr('height', legendMaxCircleSize)
-                .style('fill', d => "lightblue");
+            svgSizeLegends.selectAll('circle')
+                .data(legendSizeData, d => d.id)
+                .join(enter => enter
+                        .append('circle')
+                        .attr('cx', 0)
+                        .attr('cy', (d, i) => i * (legendMaxCircleSize*2))
+                        .attr('r', d => circleScale(d.value))
+                        .style('fill', d => "lightblue"),
+                    update => update
+                        .attr('cy', (d, i) => i * (legendMaxCircleSize*2))
+                        .attr('r', d => circleScale(d.value)),
+                    exit => exit.remove()
+                );
 
-            svgSizeLegends.selectAll('mylabels')
-                .data(legendSizeData)
-                .enter()
-                .append("text")
-                .attr("x", legendMaxCircleSize * 2)
-                .attr("y", (d, i) => i * (legendMaxCircleSize*2))
-                .style("fill", d => d.color)
-                .text(d => Math.round(d) + " degree")
-                .attr("text-anchor", "left")
-                .style("alignment-baseline", "middle");
-
+            svgSizeLegends.selectAll('text')
+                .data(legendSizeData, d => d.id)
+                .join(enter => enter
+                        .append("text")
+                        .attr("x", legendMaxCircleSize * 2)
+                        .attr("y", (d, i) => i * (legendMaxCircleSize*2))
+                        .text(d => Math.round(d.value) + " degree")
+                        .attr("text-anchor", "left")
+                        .style("alignment-baseline", "middle"),
+                    update => update
+                        .attr("y", (d, i) => i * (legendMaxCircleSize*2))
+                        .text(d => Math.round(d.value) + " degree"),
+                    exit => exit.remove()
+                );
         });
-
-
 
         const zoomHandler = d3.zoom()
             .on("zoom", (e) => {
@@ -492,19 +504,10 @@ const MainGraph = () => {
             })(svgRoot);
 
 
-        return () => {
-            console.log('Clean up');
-            d3.select('g.linkgroup').remove();
-            d3.select('g.hullgroup').remove();
-            d3.select('g.nodegroup').remove();
-
-            svg.append('g').attr('class', 'hullgroup');
-            svg.append('g').attr('class', 'linkgroup');
-            svg.append('g').attr('class', 'nodegroup');
-        }
+        return cleanUp;
     }
     
-    React.useEffect(d3UpdateFunc);
+    // React.useEffect(d3UpdateFunc);
 
     return <main className="main-ui">
         <div className="sidebar flex-shrink-0 p-3 bg-white">
@@ -611,16 +614,16 @@ const MainGraph = () => {
             </ul>
         </div>
         <div className="mainview">
-            <div>
-                <label className="selected-label" htmlFor="selected-point">Selected:</label>
-                <span id="selected-point" className="selected-label"></span>
-            </div>
             <div className="mainview-drawings">
                 <svg ref={svgRef} id="maingraph" className="maingraph" height={height} width={width} >
                     <g className="everything">
                         <g className="hullgroup"></g>
                         <g className="linkgroup"></g>
                         <g className="nodegroup"></g>
+                        <g className="legendgroup">
+                            <g className="categorylegends" transform={`translate(${width - 200},25)`}></g>
+                            <g className="sizelegends" transform={`translate(${width - 200},160)`}></g>
+                        </g>
                     </g>
                 </svg>
             </div>
