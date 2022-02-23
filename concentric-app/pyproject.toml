@@ -10,6 +10,7 @@ python = "^3.10"
 networkx = "^2.6.3"
 fastapi = "^0.73.0"
 uvicorn = "^0.17.1"
+numpy = "^1.22.2"
 
 [tool.poetry.dev-dependencies]
 
