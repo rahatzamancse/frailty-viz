@@ -1,12 +1,10 @@
 from fastapi import FastAPI
 from starlette.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
-import difflib
-from queue import PriorityQueue
 import uvicorn
-import numpy as np
-
 from pydantic import BaseModel
+
+import difflib
 
 import pickle
 import networkx as nx
@@ -78,11 +76,6 @@ G_se = nx.relabel_nodes(G_se, mapping)
 # Reverse graph: To calculate incident edges of X
 G_se_rev = G_se.reverse()
 
-freqs = np.array(list(map(lambda x: x[2]['freq'], G_se.edges.data())))
-print(freqs)
-print(freqs.min(), freqs.max(), np.mean(freqs), np.median(freqs))
-
-
 # Pre calculating the nodes
 nodes = []
 for node in list(data.nodes.data()):
@@ -117,78 +110,8 @@ async def hello_world():
     return RedirectResponse(url='/docs')
 
 
-@app.get("/nodes")
-async def get_nodes():
-    return {'nodes': nodes}
-
-
-@app.post("/related/{category}/{n}")
-async def get_n_related(category: int, n: int, nodes: NodesList):
-    nodes = nodes.nodes
-    print("Inside the classs", nodes)
-    finalList = [{
-        'id': node,
-        'category': get_category_number_from_id(node),
-        'label': d['label'] if 'label' in (d := G_se.nodes[node]) else node,
-        'freq': max_freq,
-        'influenced': True
-    } for node in nodes]
-    print(finalList)
-    for node in nodes:
-        neighbors = filter(lambda x: get_category_number_from_id(
-            x) == category, list(G_se[node]))
-        to_neighbors = sorted(
-            neighbors,
-            key=lambda x: G_se.edges[(node, x)]['freq'],
-            reverse=True
-        )[:n]
-
-        for i, v in enumerate(to_neighbors):
-            to_neighbors[i] = {
-                'id': v,
-                'category': get_category_number_from_id(v),
-                'label': d['label'] if 'label' in (d := G_se.nodes[v]) else v,
-                'freq': d['freq'] if 'freq' in (d := G_se.edges[(node, v)]) else 1,
-                'influenced': True
-            }
-
-        neighbors = filter(lambda x: get_category_number_from_id(
-            x) == category, list(G_se_rev[node]))
-        from_neighbors = sorted(
-            neighbors,
-            key=lambda x: G_se_rev.edges[(node, x)]['freq'],
-            reverse=True
-        )[:n]
-
-        for i, v in enumerate(from_neighbors):
-            from_neighbors[i] = {
-                'id': v,
-                'category': get_category_number_from_id(v),
-                'label': d['label'] if 'label' in (d := G_se_rev.nodes[v]) else v,
-                'freq': d['freq'] if 'freq' in (d := G_se_rev.edges[(node, v)]) else 1,
-                'influenced': False
-            }
-
-        seen = set(list(map(lambda x: x['id'], finalList))+nodes)
-        for e in (to_neighbors+from_neighbors):
-            found = e
-            if e['id'] in seen:
-                found_i = next((i for (i, d) in enumerate(
-                    finalList) if d['id'] == e['id']), None)
-                if not found_i:
-                    finalList.append(e)
-                    continue
-                found = finalList.pop(found_i)
-                found = found if found['freq'] >= e['freq'] else e
-            finalList.append(found)
-            seen.add(found['id'])
-
-    return {'related': sorted(finalList, key=lambda x: x['freq'], reverse=True)[:n]}
-
-
 class CategoryCount(BaseModel):
     categorycount: dict[int, int]
-
 
 @app.post('/getbestsubgraph')
 async def getbestsubgraph(nodes: NodesList, category_count: CategoryCount):
@@ -273,35 +196,6 @@ async def getbestsubgraph(nodes: NodesList, category_count: CategoryCount):
             'freq': x[2]['freq'] if 'freq' in x[2] else 1,
             'samecategory': get_category_number_from_id(x[0]) == get_category_number_from_id(x[1])
         }, subgraph.edges.data())),
-    }
-
-
-@app.get('/categories')
-async def get_categories():
-    return category_encoding
-
-
-@app.post('/getsubgraph/')
-async def getsubgraph(nodes: NodesList):
-    nodes = nodes.nodes
-    subgraph = G_se.subgraph(nodes)
-
-    nodes = [{
-        "id": node[0],
-        "label": node[1]['label'] if 'label' in node[1] else node[0],
-        "category": get_category_number_from_id(node[0])
-    } for node in subgraph.nodes.data()]
-
-    links = [{
-        "source": edge[0],
-        "target": edge[1],
-        "data": edge[2],
-        "betweencategory": get_category_number_from_id(edge[0]) != get_category_number_from_id(edge[1])
-    } for edge in subgraph.edges.data()]
-
-    return {
-        "nodes": nodes,
-        "links": links
     }
 
 
