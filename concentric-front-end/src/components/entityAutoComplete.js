@@ -1,6 +1,4 @@
 import React from 'react';
-import useFetch from "react-fetch-hook";
-// import autoComplete from "@tarekraafat/autocomplete.js";
 import { DragDropContext } from "react-beautiful-dnd";
 import Column from "../components/Column";
 
@@ -39,15 +37,12 @@ let dummyData = {
 const EntityAutoComplete = ({ fromEntityAutoComplete }) => {
     let [dataState, setDataState] = React.useState(dummyData);
 
-    async function getSuggestions(value) {
-    }
-
     const handleChange = (event) => {
         if (event.target.value.length === 0) return;
 
         fetch(`http://127.0.0.1:8000/searchnode/${event.target.value}/5`).then(response => response.json()).then(suggestions => {
             suggestions = suggestions['matches'];
-            const tasksList = dataState.columns["column-2"].taskIds.map(taskId => dataState.tasks.find(task => task.id == taskId));
+            const tasksList = dataState.columns["column-2"].taskIds.map(taskId => dataState.tasks.find(task => task.id === taskId));
             const allTasks = tasksList.concat(suggestions);
 
             const newState = {
@@ -109,11 +104,13 @@ const EntityAutoComplete = ({ fromEntityAutoComplete }) => {
         setDataState(newState);
     }
 
+    const col2TaskIds = dataState.columns['column-2'].taskIds;
+
     React.useEffect(() => {
-        const nodeList = dataState.columns['column-2'].taskIds;
+        const nodeList = col2TaskIds;
         fromEntityAutoComplete(nodeList);
 
-    }, [dataState.columns['column-2'].taskIds])
+    }, [col2TaskIds, fromEntityAutoComplete]);
 
     return <div>
         <div className="form-floating mb-3">

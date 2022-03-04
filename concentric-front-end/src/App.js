@@ -1,6 +1,6 @@
 import React from 'react';
 
-import './styles/App.css';
+import './styles/App.scss';
 import MainGraph from './components/MainGraph';
 
 const App = () => {

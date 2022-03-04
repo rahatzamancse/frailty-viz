@@ -2,7 +2,7 @@ import React from 'react';
 import * as d3 from "d3";
 import smoothHull from '../utils/convexHull';
 
-import "../styles/MainGraph.css";
+import "../styles/MainGraph.scss";
 import EntityAutoComplete from './entityAutoComplete';
 
 const dummyData = {
@@ -170,7 +170,6 @@ const MainGraph = () => {
         const svgHullGroup = svg.select('g.hullgroup');
         const svgLinkGroup = svg.select('g.linkgroup');
         const svgNodeGroup = svg.select('g.nodegroup');
-        const legendGroup = svgRoot.select('g.legendgroup');
 
         svgHullGroup
             .selectAll('path')
@@ -353,6 +352,7 @@ const MainGraph = () => {
             maxDist = Math.max(...subgraph.links.map(link => link.freq));
 
             simulation.force("link")
+                // @ts-ignore
                 .id(d => d.id)
                 .links(subgraph.links);
 
@@ -497,11 +497,10 @@ const MainGraph = () => {
                 );
         });
 
-        const zoomHandler = d3.zoom()
-            .on("zoom", (e) => {
-                svg.attr('transform', e.transform)
-            // @ts-ignore
-            })(svgRoot);
+        d3.zoom().on("zoom", (e) => {
+            svg.attr('transform', e.transform)
+        // @ts-ignore
+        })(svgRoot);
 
 
         return cleanUp;
@@ -515,9 +514,9 @@ const MainGraph = () => {
             <div className="progress mb-5">
                 <div id="alpha_value" className="progress-bar" role="progressbar" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div>
             </div>
-            <a href="/" className="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
+            <span className="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
                 <span className="fs-5 fw-semibold">Controls</span>
-            </a>
+            </span>
             <ul className="list-unstyled ps-0">
                 <li className="mb-1">
                     <button className="btn btn-toggle align-items-center rounded collapsed" data-bs-toggle="collapse" data-bs-target="#entity-collapse" aria-expanded="false">
@@ -607,7 +606,7 @@ const MainGraph = () => {
                     </button>
                     <div className="collapse" id="account-collapse">
                         <ul className="btn-toggle-nav list-unstyled fw-normal pb-1 small">
-                            <li><a href="#" className="link-dark rounded">Others</a></li>
+                            <li><span className="link-dark rounded">Others</span></li>
                         </ul>
                     </div>
                 </li>
@@ -620,10 +619,10 @@ const MainGraph = () => {
                         <g className="hullgroup"></g>
                         <g className="linkgroup"></g>
                         <g className="nodegroup"></g>
-                        <g className="legendgroup">
-                            <g className="categorylegends" transform={`translate(${width - 200},25)`}></g>
-                            <g className="sizelegends" transform={`translate(${width - 200},160)`}></g>
-                        </g>
+                    </g>
+                    <g className="legendgroup">
+                        <g className="categorylegends" transform={`translate(${width - 200},25)`}></g>
+                        <g className="sizelegends" transform={`translate(${width - 200},160)`}></g>
                     </g>
                 </svg>
             </div>
